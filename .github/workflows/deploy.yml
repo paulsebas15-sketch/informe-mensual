@@ -1,0 +1,79 @@
+# ================================================
+# DESPLIEGUE A GITHUB PAGES CON LA API KEY INYECTADA
+# ================================================
+# QUÉ HACE:
+# Cada vez que subes cambios al repositorio, este proceso automático
+# toma el index.html (que tiene el marcador __GEMINI_API_KEY__), lo
+# reemplaza por el secreto guardado en GitHub, y publica el resultado
+# en GitHub Pages. La key real NUNCA queda escrita en el código del
+# repositorio ni en su historial — solo existe en el archivo cifrado
+# de "Secrets" de GitHub y en la página ya publicada.
+#
+# INSTRUCCIONES PARA ACTIVARLO:
+# 1. En tu repositorio de GitHub: Settings > Secrets and variables >
+#    Actions > "New repository secret"
+#      Nombre:  GEMINI_API_KEY
+#      Valor:   (pega aquí tu API key real de Gemini)
+#    Guardar.
+# 2. Crea este archivo en tu repositorio exactamente en la ruta:
+#      .github/workflows/deploy.yml
+#    (la carpeta ".github/workflows/" — con el punto al inicio — debe
+#    existir tal cual; en GitHub puedes crearla escribiendo esa ruta
+#    completa en el nombre del archivo nuevo)
+# 3. En tu repositorio: Settings > Pages > en "Source" cambia de
+#    "Deploy from a branch" a "GitHub Actions".
+# 4. Sube/actualiza tu index.html como siempre (el que tiene el
+#    marcador __GEMINI_API_KEY__, no la key real).
+#
+# NOTA: Si tu rama principal no se llama "main" sino "master", cambia
+# la línea "branches: [ main ]" más abajo.
+# NOTA 2: Si tu index.html no está en la raíz del repositorio sino en
+# una subcarpeta, ajusta la ruta en el paso "Insertar API key" y en
+# "path" del paso "Subir artefacto".
+# ================================================
+
+name: Deploy a GitHub Pages
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el código del repositorio
+        uses: actions/checkout@v4
+
+      - name: Insertar API key de Gemini
+        run: |
+          sed -i "s|__GEMINI_API_KEY__|${{ secrets.GEMINI_API_KEY }}|g" index.html
+
+      - name: Configurar Pages
+        uses: actions/configure-pages@v5
+
+      - name: Subir artefacto para publicar
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Desplegar a GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
